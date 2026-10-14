@@ -1,14 +1,10 @@
 /* =====================================================================
    SIDH Tracker - config.js
-   The ONLY file where you paste your Supabase details.
+   The ONLY file where you paste your link.
 
-   Paste only these two values from Supabase:
-     1. Project URL
-     2. The key called "anon" / "public" / "publishable"
-   Never paste the key called "service_role" or "secret" here.
+   Paste the Web app URL that Google gives you at the end of the
+   "Deploy" step, between the quotation marks below.
    ===================================================================== */
 window.SIDH_CONFIG = {
-  SUPABASE_URL: "https://vhvyeimxvxstjwmixsvw.supabase.co",
-  SUPABASE_ANON_KEY: "sb_publishable_glgN66dYxqAmbEC0KR0X0g_tpzJFQgS",
-  EMAIL_DOMAIN: "sidh.example.com"   // keep as is, unless the guide says otherwise
+  API_URL: "https://script.google.com/macros/s/AKfycbzMGcx7k0LflfdUMNOTZrZ47SIvnAyy7FiRaEh7-Mu0oJX7aFL04oHf46lYHknC6BVHTw/exec"
 };
