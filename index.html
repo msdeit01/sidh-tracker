@@ -147,7 +147,6 @@ td.act .btn{margin-left:4px}
 <div id="layer"></div>
 <input type="file" id="fileIn" accept=".xlsx,.xls" class="hidden">
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="config.js"></script>
 <script>
@@ -216,7 +215,20 @@ var REF_TABLES = ["dev_types","cyber_types","ministries","personas"];
 
 /* ---------- STATE ---------- */
 var CFG = window.SIDH_CONFIG || {};
-var sb = null;
+var API = {
+  token: null,
+  call: async function(action, body){
+    var payload = Object.assign({action:action, token:API.token, ua:navigator.userAgent}, body||{});
+    var j;
+    try{
+      var res = await fetch(CFG.API_URL, {method:"POST", headers:{"Content-Type":"text/plain;charset=utf-8"}, body:JSON.stringify(payload)});
+      j = await res.json();
+    }catch(e){ return {data:null, error:{code:"NET", message:"Cannot connect"}}; }
+    if(!j || j.error) return {data:null, error:(j&&j.error)||{code:"SERVER", message:"Error"}};
+    return {data:j.data, error:null};
+  },
+  setToken: function(t){ API.token=t||null; if(t) lsSet("sidh_token",t); else lsDel("sidh_token"); }
+};
 var S = {user:null, role:null};
 var REFS = {};            /* table -> [{id,name}] */
 var RECS = {};            /* module id -> [records] */
@@ -271,41 +283,26 @@ function showLogin(msg){
 function lsGet(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } }
 function lsSet(k,v){ try{ localStorage.setItem(k,v); }catch(e){} }
 function lsDel(k){ try{ localStorage.removeItem(k); }catch(e){} }
-function lockLeft(){ var t=+lsGet("sidh_lock")||0; return Math.max(0,t-Date.now()); }
 function loginErr(msg){ var e=$("#c-0-2-3"); e.textContent=msg; e.classList.remove("hidden"); }
 async function doLogin(ev){
   ev.preventDefault();
-  var left=lockLeft();
-  if(left>0){ loginErr("Locked. Try again in "+Math.ceil(left/60000)+" min"); return; }
   var u=$("#c-0-2-1").value.trim().toLowerCase(), p=$("#c-0-2-2").value;
   if(!u||!p){ loginErr("Enter username and PIN"); return; }
   var btn=$("#c-0-2-4"); btn.disabled=true;
-  var r;
-  try{ r=await sb.auth.signInWithPassword({email:u+"@"+CFG.EMAIL_DOMAIN,password:p}); }
-  catch(e){ r={error:{message:"Network"}}; }
+  var r=await API.call("login",{username:u,pin:p});
   btn.disabled=false;
   if(r.error){
-    if(/banned/i.test(r.error.message||"")){ loginErr("Account disabled"); return; }
-    if(/network|fetch/i.test(r.error.message||"")){ loginErr("Cannot connect"); return; }
-    var n=(+lsGet("sidh_fail")||0)+1; lsSet("sidh_fail",String(n));
-    if(n>=5){ lsSet("sidh_lock",String(Date.now()+15*60000)); lsDel("sidh_fail"); loginErr("Locked. Try again in 15 min"); }
-    else loginErr("Incorrect username or PIN");
+    var c=r.error.code;
+    loginErr(c==="NET"?"Cannot connect":c==="DISABLED"?"Account disabled":c==="LOCKED"?r.error.message:c==="BUSY"?"Busy. Try again":c==="BADLOGIN"?"Incorrect username or PIN":"Could not sign in");
     $("#c-0-2-2").value=""; return;
   }
-  lsDel("sidh_fail"); lsDel("sidh_lock");
-  try{ await sb.functions.invoke("record-login",{body:{}}); }catch(e){}
+  API.setToken(r.data.token);
   lastActive=Date.now(); lsSet("sidh_active",String(lastActive));
-  await enterApp();
+  await enterApp(r.data);
 }
-async function enterApp(){
-  var s=await sb.auth.getSession();
-  var email=s.data&&s.data.session&&s.data.session.user&&s.data.session.user.email;
-  if(!email){ showLogin(); return; }
-  var uname=email.split("@")[0];
-  var q=await sb.from("app_users").select("username,role").eq("username",uname).maybeSingle();
-  if(q.error||!q.data){ await sb.auth.signOut(); showLogin("Access not available"); return; }
-  S.user=q.data.username; S.role=q.data.role;
-  $("#whoName").textContent=S.user+" · "+(S.role==="admin"?"Admin":"User");
+async function enterApp(info){
+  S.user=info.username; S.role=info.role;
+  $("#whoName").textContent=S.user+" \u00b7 "+(S.role==="admin"?"Admin":"User");
   $("#c-0-2").classList.add("hidden"); $("#appShell").classList.remove("hidden");
   startTimers();
   await loadRefs();
@@ -313,7 +310,7 @@ async function enterApp(){
   route=/^(home|m([1-9]|10))$/.test(r)||(r==="admin"&&S.role==="admin")?r:"home";
   show(route);
 }
-async function doSignOut(msg){ try{ await sb.auth.signOut(); }catch(e){} lsDel("sidh_active"); showLogin(msg||""); }
+async function doSignOut(msg){ if(API.token){ try{ await API.call("logout"); }catch(e){} } API.setToken(null); lsDel("sidh_active"); showLogin(msg||""); }
 function touch(){ var n=Date.now(); lastActive=n; if(n-lastSaved>5000){ lastSaved=n; lsSet("sidh_active",String(n)); } }
 function startTimers(){
   stopTimers();
@@ -324,8 +321,8 @@ function startTimers(){
   },20000);
   checkTimer=setInterval(async function(){
     if(!S.user) return;
-    var r=await sb.rpc("is_active");
-    if(!r.error && r.data===false) doSignOut("Signed out");
+    var r=await API.call(Date.now()-lastActive<90000?"me":"ping");
+    if(r.error && r.error.code==="AUTH") doSignOut("Signed out");
   },60000);
 }
 function stopTimers(){
@@ -334,22 +331,29 @@ function stopTimers(){
 }
 function fail(e){
   var msg=(e&&e.message)||"Error";
-  if(e&&(e.status===401||e.code==="PGRST301"||/JWT/i.test(msg))){ doSignOut("Signed out"); return; }
+  if(e&&e.code==="AUTH"){ doSignOut("Signed out"); return; }
   toast("Not saved. "+msg);
 }
 
 /* ---------- DATA ---------- */
 async function loadRefs(){
-  await Promise.all(REF_TABLES.map(async function(t){
-    var r=await sb.from(t).select("id,name").order("name");
-    if(r.error){ fail(r.error); return; }
-    REFS[t]=r.data||[];
-  }));
+  var r=await API.call("list_many",{tables:REF_TABLES});
+  if(r.error){ fail(r.error); return false; }
+  REF_TABLES.forEach(function(t){
+    REFS[t]=(r.data[t]||[]).map(function(x){ return {id:x.id,name:x.name}; }).sort(function(a,b){ return a.name.localeCompare(b.name); });
+  });
+  return true;
 }
 async function loadRecs(m){
-  var r=await sb.from(m.table).select("*").order("id");
+  var r=await API.call("list",{table:m.table});
   if(r.error){ fail(r.error); return false; }
   RECS[m.id]=r.data||[]; return true;
+}
+async function loadAllRecs(){
+  var r=await API.call("list_many",{tables:MODS.map(function(m){return m.table;})});
+  if(r.error){ fail(r.error); return false; }
+  MODS.forEach(function(m){ RECS[m.id]=r.data[m.table]||[]; });
+  return true;
 }
 
 /* ---------- NAV ---------- */
@@ -491,7 +495,7 @@ async function saveForm(frm){
     else p[f.k]=val||null;
   }
   var btn=$("#fsave"); btn.disabled=true;
-  var r= id ? await sb.from(m.table).update(p).eq("id",Number(id)) : await sb.from(m.table).insert(p);
+  var r= id ? await API.call("update",{table:m.table,id:Number(id),p:p}) : await API.call("insert",{table:m.table,rows:[p]});
   btn.disabled=false;
   if(r.error){ fail(r.error); return; }
   closeModal(); await loadRecs(m); render();
@@ -524,11 +528,11 @@ async function mgrAction(a,btn){
   var m=mod(btn.dataset.m), t=m.ref.table, id=Number(btn.dataset.i), r;
   if(a==="madd"){
     var n=$("#mnew").value.trim(); if(!n) return mErr("Enter a name");
-    r=await sb.from(t).insert({name:n});
+    r=await API.call("insert",{table:t,rows:[{name:n}]});
   } else if(a==="mrename"){
     var nv=$('input[data-i="'+id+'"]').value.trim(); if(!nv) return mErr("Enter a name");
-    r=await sb.from(t).update({name:nv}).eq("id",id);
-  } else r=await sb.from(t).delete().eq("id",id);
+    r=await API.call("update",{table:t,id:id,p:{name:nv}});
+  } else r=await API.call("delete",{table:t,id:id});
   if(r.error) return mErr(mapRefError(r.error));
   await loadRefs(); openMgr(m.id); render(true);
 }
@@ -547,7 +551,7 @@ function render(keep){
 async function show(r){
   route=r; renderNav(); closeModal();
   $("#page").innerHTML='<div class="empty">Loading</div>';
-  if(r==="home") await Promise.all(MODS.map(loadRecs));
+  if(r==="home") await loadAllRecs();
   else if(r!=="admin"){ await loadRefs(); await loadRecs(mod(r.slice(1))); }
   if(route===r) render();
   window.scrollTo(0,0);
@@ -556,14 +560,10 @@ function go(r){ if(r==="admin"&&S.role!=="admin") r="home"; location.hash=r; sho
 
 /* ---------- c-0-4 ADMIN PANEL ---------- */
 function callFn(name,body){
-  return sb.functions.invoke(name,{body:body}).then(async function(r){
-    if(r.error){
-      var msg="Could not complete";
-      try{ var j=await r.error.context.json(); if(j&&j.error) msg=j.error; }catch(e){}
-      return {ok:false,msg:msg};
-    }
-    return {ok:true,data:r.data};
-  }).catch(function(){ return {ok:false,msg:"Could not complete"}; });
+  var b=Object.assign({},body); b.op=b.action; delete b.action;
+  return API.call("admin",b).then(function(r){
+    return r.error?{ok:false,msg:r.error.message||"Could not complete"}:{ok:true,data:r.data};
+  });
 }
 function viewAdminShell(){
   return '<h1 class="pt">Admin panel<span class="code">0.4</span></h1>'+
@@ -576,7 +576,7 @@ async function fillAdmin(){
   if(!u.ok){ box.innerHTML='<div class="empty">'+esc(u.msg)+'</div>'; }
   else {
     var h='<div class="tw"><table class="wideact"><thead><tr><th>Account</th><th>Status</th><th></th></tr></thead><tbody>';
-    u.data.users.forEach(function(x){
+    u.data.forEach(function(x){
       h+='<tr><td>'+esc(x.username)+'</td><td><span class="tag '+(x.status==="Active"?"ok":"bad")+'">'+esc(x.status)+'</span></td><td class="act">'+
         '<button class="btn sm" data-a="pw" data-u="'+esc(x.username)+'">Reset password</button>'+
         '<button class="btn sm" data-a="toggle" data-u="'+esc(x.username)+'" data-s="'+esc(x.status)+'">'+(x.status==="Disabled"?"Enable":"Disable")+'</button>'+
@@ -584,15 +584,15 @@ async function fillAdmin(){
     });
     box.innerHTML=h+'</tbody></table></div>';
   }
-  var lg=await sb.rpc("get_login_log");
+  var lg=await API.call("login_log");
   var lb=$("#c-0-4-2"); if(!lb) return;
   if(lg.error){ lb.innerHTML='<div class="empty">'+esc(lg.error.message||"Error")+'</div>'; return; }
   var rows=lg.data||[];
   if(!rows.length){ lb.innerHTML='<div class="tw"><div class="empty">No logins yet</div></div>'; return; }
-  var t='<div class="tw"><table class="plain"><thead><tr><th>Account</th><th>Date</th><th>Time (IST)</th><th>IP address</th><th>Browser</th><th>Operating system</th><th></th></tr></thead><tbody>', prev="";
+  var t='<div class="tw"><table class="plain"><thead><tr><th>Account</th><th>Date</th><th>Time (IST)</th><th>Browser</th><th>Operating system</th><th></th></tr></thead><tbody>', prev="";
   rows.forEach(function(l){
     var s=fmtStamp(l.logged_at).split(" ");
-    t+='<tr><td>'+(l.username!==prev?esc(l.username):"")+'</td><td>'+s[0]+'</td><td>'+s[1]+'</td><td>'+esc(l.ip)+'</td><td>'+esc(l.browser)+'</td><td>'+esc(l.os)+'</td><td>'+(l.flagged?'<span class="tag warn">Different device</span>':"")+'</td></tr>';
+    t+='<tr><td>'+(l.username!==prev?esc(l.username):"")+'</td><td>'+s[0]+'</td><td>'+s[1]+'</td><td>'+esc(l.browser)+'</td><td>'+esc(l.os)+'</td><td>'+(l.flagged?'<span class="tag warn">Different device</span>':"")+'</td></tr>';
     prev=l.username;
   });
   lb.innerHTML=t+'</tbody></table></div>';
@@ -631,7 +631,7 @@ function templateModule(m){
   XLSX.writeFile(wb,"SIDH_"+m.name.replace(/\s+/g,"_")+"_template.xlsx");
 }
 async function backupAll(){
-  await loadRefs(); await Promise.all(MODS.map(loadRecs));
+  await loadRefs(); await loadAllRecs();
   var wb=XLSX.utils.book_new();
   MODS.forEach(function(m){ XLSX.utils.book_append_sheet(wb,sheetFrom(toAoa(m,RECS[m.id])),m.name.slice(0,31)); });
   MODS.forEach(function(m){ if(m.ref){
@@ -713,7 +713,7 @@ var PENDING = null;
 async function startImport(file,mode,m){
   var wb;
   try{ wb=await readFile(file); }catch(e){ toast("Could not read this file"); return; }
-  await loadRefs(); await Promise.all(MODS.map(loadRecs));
+  await loadRefs(); await loadAllRecs();
   var plans=[], lists=[];
   if(mode==="module"){
     var sn=wb.SheetNames[0], aoa=sheetAoa(wb.Sheets[sn]);
@@ -759,7 +759,7 @@ async function applyImport(){
     for(var t in need){
       var seen={}, rows=[];
       need[t].forEach(function(n){ if(!seen[n.toLowerCase()]){ seen[n.toLowerCase()]=1; rows.push({name:n}); } });
-      var r=await sb.from(t).insert(rows); if(r.error) throw r.error;
+      var r=await API.call("insert",{table:t,rows:rows}); if(r.error) throw r.error;
     }
     await loadRefs();
     /* 2. add and update the records */
@@ -770,11 +770,14 @@ async function applyImport(){
         var o={}; for(var k in p){ var v=p[k]; if(v&&typeof v==="object"&&v.ref){ var id=null; (REFS[m.ref.table]||[]).forEach(function(x){ if(x.name.toLowerCase()===v.ref.toLowerCase()) id=x.id; }); o[k]=id; } else o[k]=v; }
         return o;
       }
-      if(pl.res.adds.length){ var ins=await sb.from(m.table).insert(pl.res.adds.map(resolve)); if(ins.error) throw ins.error; added+=pl.res.adds.length; }
-      for(var j=0;j<pl.res.updates.length;j++){ var u=pl.res.updates[j]; var up=await sb.from(m.table).update(resolve(u.p)).eq("id",u.id); if(up.error) throw up.error; updated++; }
+      if(pl.res.adds.length||pl.res.updates.length){
+        var br=await API.call("batch",{table:m.table,inserts:pl.res.adds.map(resolve),updates:pl.res.updates.map(function(u){ return {id:u.id,p:resolve(u.p)}; })});
+        if(br.error) throw br.error;
+        added+=br.data.inserted; updated+=br.data.updated;
+      }
     }
     toast("Added "+added+", updated "+updated);
-    await Promise.all(MODS.map(loadRecs)); await loadRefs(); render();
+    await loadAllRecs(); await loadRefs(); render();
   }catch(e){ fail(e); }
 }
 
@@ -788,7 +791,7 @@ document.addEventListener("click",async function(e){
   else if(a==="edit") openForm(mid,id);
   else if(a==="del") askDelete(mid,id);
   else if(a==="delok"){
-    var m=mod(mid), r=await sb.from(m.table).delete().eq("id",Number(id));
+    var m=mod(mid), r=await API.call("delete",{table:m.table,id:Number(id)});
     if(r.error){ fail(r.error); return; }
     closeModal(); await loadRecs(m); render();
   }
@@ -796,7 +799,7 @@ document.addEventListener("click",async function(e){
   else if(a==="madd"||a==="mrename"||a==="mremove") mgrAction(a,t);
   else if(a==="tab"){ UI.tab[mid]=t.dataset.t; render(); }
   else if(a==="archive"||a==="restoreArc"){
-    var mm=mod(mid), rr=await sb.from(mm.table).update({archived:a==="archive"}).eq("id",Number(id));
+    var mm=mod(mid), rr=await API.call("update",{table:mm.table,id:Number(id),p:{archived:a==="archive"}});
     if(rr.error){ fail(rr.error); return; }
     await loadRecs(mm); render();
   }
@@ -846,17 +849,16 @@ window.addEventListener("hashchange",function(){
 
 /* ---------- START ---------- */
 (async function(){
-  if(!window.supabase||!CFG.SUPABASE_URL||/PASTE/.test(CFG.SUPABASE_URL)||/PASTE/.test(CFG.SUPABASE_ANON_KEY||"")){
+  if(!CFG.API_URL||/PASTE/.test(CFG.API_URL)){
     $("#c-0-2").classList.remove("hidden"); loginErr("Setup incomplete"); $("#c-0-2-4").disabled=true; return;
   }
-  sb=window.supabase.createClient(CFG.SUPABASE_URL,CFG.SUPABASE_ANON_KEY);
-  var s=await sb.auth.getSession();
-  var last=+lsGet("sidh_active")||0;
-  if(s.data&&s.data.session){
-    if(last && Date.now()-last>IDLE_MS){ await sb.auth.signOut(); showLogin("Signed out after 30 minutes idle"); return; }
-    var ok=await sb.rpc("is_active");
-    if(!ok.error && ok.data===true){ lastActive=Date.now(); await enterApp(); return; }
-    await sb.auth.signOut();
+  var tk=lsGet("sidh_token"), last=+lsGet("sidh_active")||0;
+  if(tk){
+    API.token=tk;
+    if(last && Date.now()-last>IDLE_MS){ await doSignOut("Signed out after 30 minutes idle"); return; }
+    var r=await API.call("me");
+    if(!r.error){ lastActive=Date.now(); lsSet("sidh_active",String(lastActive)); await enterApp(r.data); return; }
+    API.setToken(null);
   }
   showLogin();
 })();
