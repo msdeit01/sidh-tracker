@@ -1,0 +1,865 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SIDH Tracker</title>
+<style>
+:root{
+  --navy:#1f3a5f; --navy-d:#162a45; --ink:#1b2430; --grey:#5b6573; --grey-l:#8a93a0;
+  --line:#dde2e8; --bg-soft:#f4f6f9; --accent:#0f766e; --accent-d:#0b5d57; --danger:#b42318; --warn:#9a5b00; --warn-bg:#fff4dc;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{font-family:"Segoe UI",Roboto,Arial,sans-serif;font-size:15px;line-height:1.45;color:var(--ink);background:#fff}
+button,input,select,textarea{font:inherit;color:inherit}
+.code{font-size:12px;color:var(--grey-l);font-weight:400;margin-left:8px;letter-spacing:.2px}
+.hidden{display:none!important}
+
+/* login */
+.login{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;background:var(--bg-soft)}
+.lbox{width:100%;max-width:380px;background:#fff;border:1px solid var(--line);border-radius:10px;padding:30px 28px}
+.lbox h1{margin:0 0 22px;font-size:24px;color:var(--navy);font-weight:600}
+.lbox .btn{width:100%;padding:10px 14px;font-size:15px}
+
+/* shell */
+.app{display:flex;min-height:100vh}
+.side{width:260px;flex:none;background:var(--navy);color:#fff;display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow-y:auto}
+.brand{padding:20px 20px 16px;font-size:20px;font-weight:600;border-bottom:1px solid rgba(255,255,255,.14)}
+.nav{padding:10px 0;flex:1}
+.nav a{display:flex;gap:10px;padding:10px 20px;color:#d6deea;text-decoration:none;border-left:3px solid transparent;cursor:pointer}
+.nav a .n{width:20px;color:#9fb0c7;text-align:right;flex:none}
+.nav a:hover{background:rgba(255,255,255,.07);color:#fff}
+.nav a.on{background:rgba(255,255,255,.12);color:#fff;border-left-color:#5eead4}
+.nav .sep{height:1px;background:rgba(255,255,255,.14);margin:8px 20px}
+.who{padding:14px 20px;border-top:1px solid rgba(255,255,255,.14);font-size:14px;color:#c4cfdf;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.who button{background:none;border:1px solid rgba(255,255,255,.4);color:#fff;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:13px}
+.main{flex:1;min-width:0}
+.top{display:none;align-items:center;gap:12px;padding:12px 16px;background:var(--navy);color:#fff;position:sticky;top:0;z-index:20}
+.top button{background:none;border:1px solid rgba(255,255,255,.4);color:#fff;border-radius:6px;padding:6px 12px;cursor:pointer}
+.top b{font-size:18px;font-weight:600}
+.page{padding:28px 32px 60px;max-width:1280px}
+h1.pt{font-size:24px;margin:0 0 20px;color:var(--navy);font-weight:600;display:flex;align-items:baseline;flex-wrap:wrap}
+h2{font-size:17px;margin:28px 0 10px;color:var(--navy);font-weight:600}
+
+/* buttons */
+.btn{border:1px solid var(--navy);background:#fff;color:var(--navy);padding:8px 14px;border-radius:6px;cursor:pointer;font-size:14px}
+.btn:hover{background:var(--bg-soft)}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.pri:hover{background:var(--accent-d)}
+.btn.dan{border-color:var(--danger);color:var(--danger)}
+.btn.dan:hover{background:#fdecea}
+.btn.sm{padding:4px 10px;font-size:13px}
+.btn[disabled]{opacity:.5;cursor:default}
+.link{background:none;border:none;color:var(--accent);cursor:pointer;padding:8px 4px;text-decoration:underline;font-size:14px}
+.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:18px}
+.bar .grow{flex:1}
+
+/* tables */
+.tw{overflow-x:auto;border:1px solid var(--line);border-radius:8px;margin-bottom:6px}
+table{border-collapse:collapse;width:100%;min-width:780px;table-layout:fixed;font-size:14px;word-wrap:break-word}
+th:last-child{width:200px}
+.wideact th:last-child{width:400px}
+.plain th:last-child{width:auto}
+th{background:var(--bg-soft);color:var(--navy);text-align:left;font-weight:600;padding:10px 12px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+tr:last-child td{border-bottom:none}
+td.act{white-space:nowrap;text-align:right}
+td.act .btn{margin-left:4px}
+.upd{display:block;font-size:12px;color:var(--grey-l);margin-top:2px}
+.empty{padding:18px 12px;color:var(--grey)}
+.group{margin-bottom:22px}
+.group h3{margin:0 0 8px;font-size:16px;color:var(--navy);font-weight:600}
+.group h3 span{font-weight:400;color:var(--grey-l);font-size:13px;margin-left:8px}
+.tag{display:inline-block;padding:2px 8px;border-radius:10px;font-size:12.5px;background:var(--bg-soft);border:1px solid var(--line);color:var(--navy);white-space:nowrap}
+.tag.ok{background:#e4f4ef;border-color:#b6e0d3;color:#0b5d57}
+.tag.warn{background:var(--warn-bg);border-color:#f0d48f;color:var(--warn)}
+.tag.bad{background:#fdecea;border-color:#f3b9b2;color:var(--danger)}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-bottom:18px}
+.tabs button{background:none;border:none;padding:10px 16px;cursor:pointer;color:var(--grey);border-bottom:3px solid transparent;font-size:15px}
+.tabs button.on{color:var(--navy);border-bottom-color:var(--accent);font-weight:600}
+
+/* home */
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px}
+.card{border:1px solid var(--line);border-radius:8px;padding:16px;cursor:pointer;background:#fff}
+.card:hover{border-color:var(--navy);background:var(--bg-soft)}
+.card .t{font-weight:600;color:var(--navy)}
+.card .c{font-size:13px;color:var(--grey-l);margin-top:2px}
+.card .k{font-size:26px;font-weight:600;color:var(--ink);margin-top:8px}
+
+/* modal */
+.ov{position:fixed;inset:0;background:rgba(20,30,45,.5);display:flex;align-items:flex-start;justify-content:center;padding:40px 14px;overflow-y:auto;z-index:50}
+.md{background:#fff;border-radius:10px;width:100%;max-width:560px;padding:22px 24px;box-shadow:0 10px 40px rgba(0,0,0,.25)}
+.md.wide{max-width:720px}
+.md h3{margin:0 0 16px;font-size:18px;color:var(--navy);font-weight:600}
+.fld{margin-bottom:14px}
+.fld.hide{display:none}
+.fld label{display:block;font-size:14px;font-weight:600;margin-bottom:4px;color:var(--navy)}
+.fld label .code{font-weight:400}
+.fld input,.fld select,.fld textarea{width:100%;padding:9px 10px;border:1px solid #b8c0cc;border-radius:6px;background:#fff;font-size:15px}
+.fld textarea{min-height:84px;resize:vertical}
+.fld input:focus,.fld select:focus,.fld textarea:focus{outline:2px solid var(--accent);outline-offset:0;border-color:var(--accent)}
+.req{color:var(--danger)}
+.err{color:var(--danger);font-size:14px;margin:0 0 10px}
+.mf{display:flex;justify-content:flex-end;gap:8px;margin-top:18px}
+.row{display:flex;gap:8px;margin-bottom:8px}
+.row input{flex:1;padding:8px 10px;border:1px solid #b8c0cc;border-radius:6px;font-size:15px}
+.toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--navy-d);color:#fff;padding:10px 18px;border-radius:6px;font-size:14px;z-index:90;box-shadow:0 4px 16px rgba(0,0,0,.25)}
+.sum td,.sum th{padding:8px 10px}
+.sum table{min-width:0;table-layout:auto}
+.elist{max-height:200px;overflow-y:auto;font-size:14px;border:1px solid var(--line);border-radius:6px;padding:8px 12px;margin:10px 0 0}
+.elist div{padding:2px 0}
+
+@media (max-width:860px){
+  .side{position:fixed;left:-280px;z-index:40;transition:left .2s;height:100%}
+  .side.open{left:0}
+  .top{display:flex}
+  .page{padding:18px 14px 50px}
+  h1.pt{font-size:21px}
+}
+</style>
+</head>
+<body>
+
+<!-- ===== c-0-2 : Login (username and PIN) ===== -->
+<div class="login hidden" id="c-0-2">
+  <form class="lbox" id="loginForm" novalidate>
+    <h1>SIDH Tracker</h1>
+    <div class="fld"><label for="c-0-2-1">Username</label><input id="c-0-2-1" autocomplete="username" autocapitalize="none" spellcheck="false"></div>
+    <div class="fld"><label for="c-0-2-2">PIN</label><input id="c-0-2-2" type="password" autocomplete="current-password"></div>
+    <p class="err hidden" id="c-0-2-3"></p>
+    <button class="btn pri" type="submit" id="c-0-2-4">Sign in</button>
+  </form>
+</div>
+
+<!-- ===== Shell ===== -->
+<div class="app hidden" id="appShell">
+  <aside class="side" id="c-0-3-nav">
+    <div class="brand">SIDH Tracker</div>
+    <nav class="nav" id="nav"></nav>
+    <div class="who"><span id="whoName"></span><button id="signOutBtn">Sign out</button></div>
+  </aside>
+  <div class="main">
+    <div class="top"><button id="menuBtn">Menu</button><b>SIDH Tracker</b></div>
+    <div class="page" id="page"></div>
+  </div>
+</div>
+<div id="layer"></div>
+<input type="file" id="fileIn" accept=".xlsx,.xls" class="hidden">
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="config.js"></script>
+<script>
+/* =====================================================================
+   SIDH Tracker - app logic
+   Code markers: c-M-S-F  =  Module . Section . Field
+   ===================================================================== */
+
+/* ---------- STATIC LISTS ---------- */
+var STATES = ["Andhra Pradesh","Arunachal Pradesh","Assam","Bihar","Chhattisgarh","Goa","Gujarat","Haryana","Himachal Pradesh","Jharkhand","Karnataka","Kerala","Madhya Pradesh","Maharashtra","Manipur","Meghalaya","Mizoram","Nagaland","Odisha","Punjab","Rajasthan","Sikkim","Tamil Nadu","Telangana","Tripura","Uttar Pradesh","Uttarakhand","West Bengal",
+  "Andaman and Nicobar Islands","Chandigarh","Dadra and Nagar Haveli and Daman and Diu","Delhi","Jammu and Kashmir","Ladakh","Lakshadweep","Puducherry"];
+var OB_TYPES = ["Full Onboarding","API Data Sharing"];
+var D_TYPES = ["eKYC data","Non-KYC data"];
+var OB_STATUS = ["Credentials Shared","Batches Created","Not Onboarded Yet"];
+var IDLE_MS = 30*60*1000;
+
+/* ---------- MODULE DEFINITIONS (x.1 list, x.2 form) ---------- */
+/* f = form fields in order (field code = module.2.position). k = database column. */
+var BATCH_SHOW = function(v){ return v.scheme_type==="Full Onboarding" && v.onboarding_status==="Batches Created"; };
+var SCHEME_F = [
+  {k:"scheme_name",l:"Scheme Name"},{k:"description",l:"Description (for this scheme)",t:"area"},
+  {k:"scheme_type",l:"Type",t:"sel",o:OB_TYPES},
+  {k:"data_type",l:"Data Type",t:"sel",o:D_TYPES,show:function(v){return v.scheme_type==="API Data Sharing";}},
+  {k:"onboarding_status",l:"Onboarding Status",t:"sel",o:OB_STATUS,show:function(v){return v.scheme_type==="Full Onboarding";}},
+  {k:"latest_batch_date",l:"Latest Batch Date",t:"date",show:BATCH_SHOW}
+];
+var MODS = [
+ {id:1,name:"Development Activities",table:"dev_activities",tk:"title",
+  ref:{table:"dev_types",col:"type_id",label:"Types",mgr:"1.4",listName:"Dev Types"},
+  f:[{k:"type_id",l:"Type",t:"ref"},{k:"title",l:"Title"},{k:"description",l:"Description",t:"area"},{k:"expected_date",l:"Expected Release Date",t:"date"},{k:"revised_date",l:"Revised Release Date",t:"date"},{k:"remarks",l:"Remarks",t:"area"}],
+  cols:["title","description","expected_date","revised_date","remarks"]},
+ {id:2,name:"Cyber Security Matters",table:"cyber_matters",tk:"title",
+  ref:{table:"cyber_types",col:"type_id",label:"Types",mgr:"2.4",listName:"Cyber Types"},
+  f:[{k:"type_id",l:"Type",t:"ref"},{k:"title",l:"Title"},{k:"description",l:"Description",t:"area"},{k:"expected_date",l:"Expected Release Date",t:"date"},{k:"revised_date",l:"Revised Release Date",t:"date"},{k:"remarks",l:"Remarks",t:"area"}],
+  cols:["title","description","expected_date","revised_date","remarks"]},
+ {id:3,name:"Compliance Matters",table:"compliance_matters",tk:"title",
+  f:[{k:"title",l:"Title"},{k:"description",l:"Description",t:"area"},{k:"expected_date",l:"Expected Completion Date",t:"date"},{k:"revised_date",l:"Revised Completion Date",t:"date"}],
+  cols:["title","description","expected_date","revised_date"]},
+ {id:4,name:"Replies to Communications",table:"replies",tk:"title",
+  f:[{k:"title",l:"Title"},{k:"description",l:"Description",t:"area"},{k:"expected_date",l:"Expected Completion Date",t:"date"},{k:"revised_date",l:"Revised Completion Date",t:"date"}],
+  cols:["title","description","expected_date","revised_date"]},
+ {id:5,name:"Sharing of Information on SIDH",table:"info_sharing",tk:"title",
+  f:[{k:"title",l:"Title"},{k:"description",l:"Description",t:"area"},{k:"expected_date",l:"Expected Completion Date",t:"date"},{k:"revised_date",l:"Revised Completion Date",t:"date"}],
+  cols:["title","description","expected_date","revised_date"]},
+ {id:6,name:"Platform Integration Status",table:"integrations",tk:"name",
+  f:[{k:"name",l:"Integration Name"},{k:"description",l:"Description",t:"area"},{k:"status",l:"Status",t:"sel",o:["Completed","Ongoing","Proposed"]},
+     {k:"expected_time",l:"Expected Time to Complete",show:function(v){return v.status==="Ongoing";}}],
+  cols:["name","description","status","expected_time"]},
+ {id:7,name:"States Scheme Onboarding",table:"state_schemes",tk:"scheme_name",arch:"7.4",
+  group:{col:"state",label:"State or UT"},
+  f:[{k:"state",l:"State or UT",t:"sel",o:STATES}].concat(SCHEME_F),
+  cols:["scheme_name","description","scheme_type","detail","latest_batch_date"]},
+ {id:8,name:"Central Scheme Onboarding",table:"central_schemes",tk:"scheme_name",arch:"8.5",
+  ref:{table:"ministries",col:"ministry_id",label:"Ministries / Departments",mgr:"8.4",listName:"Ministries"},
+  f:[{k:"ministry_id",l:"Ministry or Department",t:"ref"}].concat(SCHEME_F),
+  cols:["scheme_name","description","scheme_type","detail","latest_batch_date"]},
+ {id:9,name:"Platform Information",table:"platform_info",tk:"parameter_name",
+  f:[{k:"parameter_name",l:"Parameter Name"},{k:"description",l:"Description",t:"area"},{k:"value",l:"Value"}],
+  cols:["parameter_name","description","value"]},
+ {id:10,name:"SIDH Features",table:"features",tk:"feature_name",
+  ref:{table:"personas",col:"persona_id",label:"Personas",mgr:"10.4",listName:"Personas"},
+  f:[{k:"persona_id",l:"Persona",t:"ref"},{k:"feature_name",l:"Feature Name"},{k:"description",l:"Description",t:"area"},{k:"feature_date",l:"Feature Date",t:"date"}],
+  cols:["feature_name","description","feature_date"]}
+];
+var REF_TABLES = ["dev_types","cyber_types","ministries","personas"];
+
+/* ---------- STATE ---------- */
+var CFG = window.SIDH_CONFIG || {};
+var sb = null;
+var S = {user:null, role:null};
+var REFS = {};            /* table -> [{id,name}] */
+var RECS = {};            /* module id -> [records] */
+var UI = {tab:{}};
+var route = "home";
+var idleTimer = null, checkTimer = null, lastActive = Date.now(), lastSaved = 0;
+
+/* ---------- HELPERS ---------- */
+function mod(id){ return MODS.filter(function(m){return m.id===+id;})[0]; }
+function fdef(m,k){ return m.f.filter(function(f){return f.k===k;})[0]; }
+function esc(s){ return String(s==null?"":s).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];}); }
+function fmtDate(iso){ if(!iso) return ""; var p=String(iso).slice(0,10).split("-"); return p[2]+"-"+p[1]+"-"+p[0]; }
+function fmtStamp(iso){
+  var s=new Intl.DateTimeFormat("en-GB",{timeZone:"Asia/Kolkata",day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit",hour12:false}).format(new Date(iso));
+  return s.replace(/\//g,"-").replace(",","");
+}
+function $(s,r){ return (r||document).querySelector(s); }
+function toast(msg){ var t=document.createElement("div"); t.className="toast"; t.textContent=msg; document.body.appendChild(t); setTimeout(function(){ t.remove(); },2600); }
+function closeModal(){ $("#layer").innerHTML=""; }
+function openModal(html,wide){ $("#layer").innerHTML='<div class="ov"><div class="md'+(wide?' wide':'')+'">'+html+'</div></div>'; }
+function oneYearAgo(){ var d=new Date(); d.setFullYear(d.getFullYear()-1); return d.toISOString().slice(0,10); }
+function suggestArchive(r){ return r.onboarding_status==="Batches Created" && r.latest_batch_date && String(r.latest_batch_date).slice(0,10) < oneYearAgo(); }
+function refName(table,id){ var l=REFS[table]||[]; for(var i=0;i<l.length;i++) if(l[i].id===id) return l[i].name; return ""; }
+function todayStamp(){ return fmtDate(new Date().toISOString().slice(0,10)); }
+
+/* ---------- DATES (dd-mm-yyyy in the screens, yyyy-mm-dd in the database) ---------- */
+function isoValid(y,m,d){ var t=new Date(Date.UTC(y,m-1,d)); return t.getUTCFullYear()===y && t.getUTCMonth()===m-1 && t.getUTCDate()===d; }
+function pad2(n){ return (n<10?"0":"")+n; }
+/* returns {ok:true, iso:"yyyy-mm-dd"|null} or {ok:false} */
+function parseDate(v){
+  if(v===null||v===undefined||v==="") return {ok:true,iso:null};
+  if(typeof v==="number"){
+    if(v>20000 && v<80000){ var d=new Date(Date.UTC(1899,11,30)+Math.round(v)*864e5); return {ok:true,iso:d.getUTCFullYear()+"-"+pad2(d.getUTCMonth()+1)+"-"+pad2(d.getUTCDate())}; }
+    return {ok:false};
+  }
+  var s=String(v).trim(); if(!s) return {ok:true,iso:null};
+  var m=s.match(/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{4})$/);
+  if(m){ var dd=+m[1],mm=+m[2],yy=+m[3]; return isoValid(yy,mm,dd)?{ok:true,iso:yy+"-"+pad2(mm)+"-"+pad2(dd)}:{ok:false}; }
+  m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if(m){ var y2=+m[1],m2=+m[2],d2=+m[3]; return isoValid(y2,m2,d2)?{ok:true,iso:y2+"-"+pad2(m2)+"-"+pad2(d2)}:{ok:false}; }
+  return {ok:false};
+}
+
+/* ---------- SESSION: login (0.2), idle timeout, sign-out ---------- */
+function showLogin(msg){
+  stopTimers(); S.user=null; S.role=null; RECS={}; REFS={}; closeModal();
+  $("#appShell").classList.add("hidden"); $("#c-0-2").classList.remove("hidden");
+  $("#c-0-2-2").value="";
+  var e=$("#c-0-2-3");
+  if(msg){ e.textContent=msg; e.classList.remove("hidden"); } else e.classList.add("hidden");
+}
+function lsGet(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } }
+function lsSet(k,v){ try{ localStorage.setItem(k,v); }catch(e){} }
+function lsDel(k){ try{ localStorage.removeItem(k); }catch(e){} }
+function lockLeft(){ var t=+lsGet("sidh_lock")||0; return Math.max(0,t-Date.now()); }
+function loginErr(msg){ var e=$("#c-0-2-3"); e.textContent=msg; e.classList.remove("hidden"); }
+async function doLogin(ev){
+  ev.preventDefault();
+  var left=lockLeft();
+  if(left>0){ loginErr("Locked. Try again in "+Math.ceil(left/60000)+" min"); return; }
+  var u=$("#c-0-2-1").value.trim().toLowerCase(), p=$("#c-0-2-2").value;
+  if(!u||!p){ loginErr("Enter username and PIN"); return; }
+  var btn=$("#c-0-2-4"); btn.disabled=true;
+  var r;
+  try{ r=await sb.auth.signInWithPassword({email:u+"@"+CFG.EMAIL_DOMAIN,password:p}); }
+  catch(e){ r={error:{message:"Network"}}; }
+  btn.disabled=false;
+  if(r.error){
+    if(/banned/i.test(r.error.message||"")){ loginErr("Account disabled"); return; }
+    if(/network|fetch/i.test(r.error.message||"")){ loginErr("Cannot connect"); return; }
+    var n=(+lsGet("sidh_fail")||0)+1; lsSet("sidh_fail",String(n));
+    if(n>=5){ lsSet("sidh_lock",String(Date.now()+15*60000)); lsDel("sidh_fail"); loginErr("Locked. Try again in 15 min"); }
+    else loginErr("Incorrect username or PIN");
+    $("#c-0-2-2").value=""; return;
+  }
+  lsDel("sidh_fail"); lsDel("sidh_lock");
+  try{ await sb.functions.invoke("record-login",{body:{}}); }catch(e){}
+  lastActive=Date.now(); lsSet("sidh_active",String(lastActive));
+  await enterApp();
+}
+async function enterApp(){
+  var s=await sb.auth.getSession();
+  var email=s.data&&s.data.session&&s.data.session.user&&s.data.session.user.email;
+  if(!email){ showLogin(); return; }
+  var uname=email.split("@")[0];
+  var q=await sb.from("app_users").select("username,role").eq("username",uname).maybeSingle();
+  if(q.error||!q.data){ await sb.auth.signOut(); showLogin("Access not available"); return; }
+  S.user=q.data.username; S.role=q.data.role;
+  $("#whoName").textContent=S.user+" · "+(S.role==="admin"?"Admin":"User");
+  $("#c-0-2").classList.add("hidden"); $("#appShell").classList.remove("hidden");
+  startTimers();
+  await loadRefs();
+  var r=location.hash.slice(1);
+  route=/^(home|m([1-9]|10))$/.test(r)||(r==="admin"&&S.role==="admin")?r:"home";
+  show(route);
+}
+async function doSignOut(msg){ try{ await sb.auth.signOut(); }catch(e){} lsDel("sidh_active"); showLogin(msg||""); }
+function touch(){ var n=Date.now(); lastActive=n; if(n-lastSaved>5000){ lastSaved=n; lsSet("sidh_active",String(n)); } }
+function startTimers(){
+  stopTimers();
+  ["mousemove","keydown","click","touchstart","scroll"].forEach(function(ev){ window.addEventListener(ev,touch,{passive:true}); });
+  idleTimer=setInterval(function(){
+    var last=Math.max(lastActive,+lsGet("sidh_active")||0);
+    if(Date.now()-last>IDLE_MS) doSignOut("Signed out after 30 minutes idle");
+  },20000);
+  checkTimer=setInterval(async function(){
+    if(!S.user) return;
+    var r=await sb.rpc("is_active");
+    if(!r.error && r.data===false) doSignOut("Signed out");
+  },60000);
+}
+function stopTimers(){
+  if(idleTimer) clearInterval(idleTimer); if(checkTimer) clearInterval(checkTimer); idleTimer=checkTimer=null;
+  ["mousemove","keydown","click","touchstart","scroll"].forEach(function(ev){ window.removeEventListener(ev,touch); });
+}
+function fail(e){
+  var msg=(e&&e.message)||"Error";
+  if(e&&(e.status===401||e.code==="PGRST301"||/JWT/i.test(msg))){ doSignOut("Signed out"); return; }
+  toast("Not saved. "+msg);
+}
+
+/* ---------- DATA ---------- */
+async function loadRefs(){
+  await Promise.all(REF_TABLES.map(async function(t){
+    var r=await sb.from(t).select("id,name").order("name");
+    if(r.error){ fail(r.error); return; }
+    REFS[t]=r.data||[];
+  }));
+}
+async function loadRecs(m){
+  var r=await sb.from(m.table).select("*").order("id");
+  if(r.error){ fail(r.error); return false; }
+  RECS[m.id]=r.data||[]; return true;
+}
+
+/* ---------- NAV ---------- */
+function renderNav(){
+  var h='<a data-r="home" class="'+(route==="home"?"on":"")+'"><span class="n"></span>Home</a><div class="sep"></div>';
+  MODS.forEach(function(m){ h+='<a data-r="m'+m.id+'" class="'+(route==="m"+m.id?"on":"")+'"><span class="n">'+m.id+'</span>'+esc(m.name)+'</a>'; });
+  if(S.role==="admin") h+='<div class="sep"></div><a data-r="admin" class="'+(route==="admin"?"on":"")+'"><span class="n"></span>Admin panel</a>';
+  $("#nav").innerHTML=h;
+}
+
+/* ---------- c-0-3 HOME, c-0-5 BACKUP ---------- */
+function viewHome(){
+  var h='<!-- c-0-3 --><h1 class="pt">Home<span class="code">0.3</span></h1>';
+  h+='<!-- c-0-5 --><div class="bar" id="c-0-5"><button class="btn" data-a="backup">Backup all</button><button class="btn" data-a="restore">Restore</button><span class="code">0.5</span></div>';
+  h+='<div class="cards" id="c-0-3">';
+  MODS.forEach(function(m){
+    var n=(RECS[m.id]||[]).filter(function(r){return !r.archived;}).length;
+    h+='<div class="card" data-r="m'+m.id+'"><div class="t">'+esc(m.name)+'</div><div class="c">'+m.id+'</div><div class="k">'+n+'</div></div>';
+  });
+  return h+'</div>';
+}
+
+/* ---------- x.1 LIST ---------- */
+function cell(m,r,c){
+  if(c==="detail"){
+    if(r.scheme_type==="API Data Sharing") return esc(r.data_type);
+    var t=esc(r.onboarding_status);
+    if(r.onboarding_status==="Batches Created") t='<span class="tag ok">'+t+'</span>';
+    else if(r.onboarding_status==="Not Onboarded Yet") t='<span class="tag">'+t+'</span>';
+    else if(r.onboarding_status) t='<span class="tag warn">'+t+'</span>';
+    if(!r.archived && suggestArchive(r)) t+=' <span class="tag bad">Suggest archival</span>';
+    return t;
+  }
+  var f=fdef(m,c), v=r[c];
+  if(f&&f.t==="date") return esc(fmtDate(v));
+  if(c==="status"){ var cls=v==="Completed"?"ok":v==="Ongoing"?"warn":""; return v?'<span class="tag '+cls+'">'+esc(v)+'</span>':""; }
+  return esc(v);
+}
+function colLabel(m,c){ return c==="detail" ? "Data Type / Status" : fdef(m,c).l; }
+function tableFor(m,rows,archived){
+  if(!rows.length) return '<div class="tw"><div class="empty">No items</div></div>';
+  var h='<div class="tw"><table><thead><tr>';
+  m.cols.forEach(function(c){ h+='<th>'+esc(colLabel(m,c))+'</th>'; });
+  h+='<th></th></tr></thead><tbody>';
+  rows.forEach(function(r){
+    h+='<tr>';
+    m.cols.forEach(function(c,ci){
+      h+='<td>'+cell(m,r,c);
+      if(ci===0) h+='<span class="upd">'+fmtStamp(r.updated_at)+' IST</span>';
+      h+='</td>';
+    });
+    h+='<td class="act">';
+    if(archived) h+='<button class="btn sm" data-a="restoreArc" data-m="'+m.id+'" data-id="'+r.id+'">Restore</button>';
+    else {
+      if(m.arch && suggestArchive(r)) h+='<button class="btn sm" data-a="archive" data-m="'+m.id+'" data-id="'+r.id+'">Archive</button>';
+      h+='<button class="btn sm" data-a="edit" data-m="'+m.id+'" data-id="'+r.id+'">Edit</button>';
+    }
+    h+='<button class="btn sm dan" data-a="del" data-m="'+m.id+'" data-id="'+r.id+'">Delete</button></td></tr>';
+  });
+  return h+'</tbody></table></div>';
+}
+function viewModule(id){
+  var m=mod(id), all=RECS[m.id]||[], tab=UI.tab[m.id]||"active";
+  var live=all.filter(function(r){return !r.archived;}), arc=all.filter(function(r){return r.archived;});
+  var h='<h1 class="pt">'+esc(m.name)+'<span class="code">'+m.id+'</span></h1>';
+  h+='<div class="bar" id="c-'+m.id+'-3"><button class="btn pri" data-a="add" data-m="'+m.id+'" id="c-'+m.id+'-2">Add</button>';
+  if(m.ref) h+='<button class="btn" data-a="mgr" data-m="'+m.id+'" id="c-'+m.id+'-4">Manage '+esc(m.ref.label.toLowerCase())+'<span class="code">'+m.ref.mgr+'</span></button>';
+  h+='<span class="grow"></span><button class="btn" data-a="export" data-m="'+m.id+'">Export</button><button class="btn" data-a="import" data-m="'+m.id+'">Import</button><button class="link" data-a="template" data-m="'+m.id+'">Download blank template</button><span class="code">'+m.id+'.3</span></div>';
+  if(m.arch){
+    h+='<div class="tabs" id="c-'+m.arch.replace(".","-")+'"><button data-a="tab" data-m="'+m.id+'" data-t="active" class="'+(tab==="active"?"on":"")+'">Schemes ('+live.length+')</button><button data-a="tab" data-m="'+m.id+'" data-t="arch" class="'+(tab==="arch"?"on":"")+'">Archived ('+arc.length+')</button><span class="code" style="align-self:center">'+m.arch+'</span></div>';
+  }
+  var archived=!!(m.arch&&tab==="arch"), rows=archived?arc:live;
+  h+='<div id="c-'+m.id+'-1"><!-- c-'+m.id+'-1 list -->';
+  if(m.ref||m.group){
+    var groups=[], map={};
+    function put(key,name){ map[key]={name:name,rows:[]}; groups.push(map[key]); }
+    if(m.ref) (REFS[m.ref.table]||[]).forEach(function(x){ put("r"+x.id,x.name); });
+    else STATES.forEach(function(s){ put("s"+s,s); });
+    var gcol=m.ref?m.ref.col:m.group.col;
+    rows.forEach(function(r){
+      var v=r[gcol], key=v==null||v===""?"none":(m.ref?"r"+v:"s"+v);
+      if(!map[key]) put(key,key==="none"?"Not set":String(v));
+      map[key].rows.push(r);
+    });
+    var shown=0;
+    groups.forEach(function(g){
+      if(!g.rows.length && !m.ref) return;
+      shown++;
+      h+='<div class="group"><h3>'+esc(g.name)+'<span>'+g.rows.length+'</span></h3>'+tableFor(m,g.rows,archived)+'</div>';
+    });
+    if(!shown) h+='<div class="tw"><div class="empty">No items</div></div>';
+  } else h+=tableFor(m,rows,archived);
+  return h+'</div>';
+}
+
+/* ---------- x.2 FORM ---------- */
+function formHtml(m,rec){
+  var v=rec||{};
+  var h='<h3>'+(rec?"Edit":"Add")+' &middot; '+esc(m.name)+'<span class="code">'+m.id+'.2</span></h3><form id="frm" data-m="'+m.id+'" data-id="'+(rec?rec.id:"")+'" novalidate>';
+  m.f.forEach(function(f,i){
+    var code=m.id+".2."+(i+1), id="c-"+m.id+"-2-"+(i+1), val=v[f.k]==null?"":v[f.k];
+    h+='<div class="fld" data-k="'+f.k+'"><label for="'+id+'">'+esc(f.l)+(f.k===m.tk?' <span class="req">*</span>':'')+'<span class="code">'+code+'</span></label>';
+    if(f.t==="area") h+='<textarea id="'+id+'" name="'+f.k+'">'+esc(val)+'</textarea>';
+    else if(f.t==="date") h+='<input type="text" inputmode="numeric" maxlength="10" placeholder="dd-mm-yyyy" id="'+id+'" name="'+f.k+'" value="'+esc(fmtDate(val))+'">';
+    else if(f.t==="ref"){
+      h+='<select id="'+id+'" name="'+f.k+'"><option value=""></option>';
+      (REFS[m.ref.table]||[]).forEach(function(o){ h+='<option value="'+o.id+'"'+(o.id===val?" selected":"")+'>'+esc(o.name)+'</option>'; });
+      h+='</select>';
+    } else if(f.t==="sel"){
+      h+='<select id="'+id+'" name="'+f.k+'"><option value=""></option>';
+      f.o.forEach(function(o){ h+='<option'+(o===val?" selected":"")+'>'+esc(o)+'</option>'; });
+      if(val && f.o.indexOf(val)<0) h+='<option selected>'+esc(val)+'</option>';
+      h+='</select>';
+    } else h+='<input type="text" id="'+id+'" name="'+f.k+'" value="'+esc(val)+'">';
+    h+='</div>';
+  });
+  h+='<p class="err hidden" id="ferr"></p><div class="mf"><button type="button" class="btn" data-a="close">Cancel</button><button type="submit" class="btn pri" id="fsave">Save</button></div></form>';
+  return h;
+}
+function readForm(frm){ var o={}; [].forEach.call(frm.elements,function(e){ if(e.name) o[e.name]=e.value.trim(); }); return o; }
+function syncVisibility(frm){
+  var m=mod(frm.dataset.m), v=readForm(frm);
+  m.f.forEach(function(f){ if(!f.show) return; $('.fld[data-k="'+f.k+'"]',frm).classList.toggle("hide",!f.show(v)); });
+}
+function openForm(mid,id){
+  var m=mod(mid), rec=id?(RECS[m.id]||[]).filter(function(r){return String(r.id)===String(id);})[0]:null;
+  openModal(formHtml(m,rec)); syncVisibility($("#frm"));
+  var first=$("#frm input,#frm select"); if(first) first.focus();
+}
+function formErr(msg){ var e=$("#ferr"); e.textContent=msg; e.classList.remove("hidden"); }
+async function saveForm(frm){
+  var m=mod(frm.dataset.m), v=readForm(frm), id=frm.dataset.id, p={};
+  if(!v[m.tk]) return formErr(fdef(m,m.tk).l+" is required");
+  for(var i=0;i<m.f.length;i++){
+    var f=m.f[i], val=v[f.k];
+    if(f.show && !f.show(v)){ p[f.k]=null; continue; }
+    if(f.t==="date"){ var d=parseDate(val); if(!d.ok) return formErr(f.l+": use dd-mm-yyyy"); p[f.k]=d.iso; }
+    else if(f.t==="ref") p[f.k]=val?Number(val):null;
+    else p[f.k]=val||null;
+  }
+  var btn=$("#fsave"); btn.disabled=true;
+  var r= id ? await sb.from(m.table).update(p).eq("id",Number(id)) : await sb.from(m.table).insert(p);
+  btn.disabled=false;
+  if(r.error){ fail(r.error); return; }
+  closeModal(); await loadRecs(m); render();
+}
+
+/* ---------- DELETE ---------- */
+function askDelete(mid,id){
+  openModal('<h3>Delete this item?</h3><div class="mf"><button class="btn" data-a="close">Cancel</button><button class="btn dan" data-a="delok" data-m="'+mid+'" data-id="'+id+'">Delete</button></div>');
+}
+
+/* ---------- x.4 LIST MANAGER (types, ministries, personas) ---------- */
+function openMgr(mid){
+  var m=mod(mid), list=REFS[m.ref.table]||[];
+  var h='<h3>'+esc(m.ref.label)+'<span class="code">'+m.ref.mgr+'</span></h3><p class="err hidden" id="merr"></p>';
+  if(!list.length) h+='<div class="empty" style="padding:6px 0">None yet</div>';
+  list.forEach(function(n){
+    h+='<div class="row"><input value="'+esc(n.name)+'" data-i="'+n.id+'"><button class="btn sm" data-a="mrename" data-m="'+mid+'" data-i="'+n.id+'">Save</button><button class="btn sm dan" data-a="mremove" data-m="'+mid+'" data-i="'+n.id+'">Remove</button></div>';
+  });
+  h+='<div class="row" style="margin-top:14px"><input id="mnew" placeholder="New name"><button class="btn pri sm" data-a="madd" data-m="'+mid+'">Add</button></div>';
+  h+='<div class="mf"><button class="btn" data-a="close">Close</button></div>';
+  openModal(h);
+}
+function mErr(msg){ var e=$("#merr"); if(e){ e.textContent=msg; e.classList.remove("hidden"); } }
+function mapRefError(e){
+  if(e.code==="23503") return "Cannot remove. Items exist under it.";
+  if(e.code==="23505") return "Name already exists";
+  return e.message||"Error";
+}
+async function mgrAction(a,btn){
+  var m=mod(btn.dataset.m), t=m.ref.table, id=Number(btn.dataset.i), r;
+  if(a==="madd"){
+    var n=$("#mnew").value.trim(); if(!n) return mErr("Enter a name");
+    r=await sb.from(t).insert({name:n});
+  } else if(a==="mrename"){
+    var nv=$('input[data-i="'+id+'"]').value.trim(); if(!nv) return mErr("Enter a name");
+    r=await sb.from(t).update({name:nv}).eq("id",id);
+  } else r=await sb.from(t).delete().eq("id",id);
+  if(r.error) return mErr(mapRefError(r.error));
+  await loadRefs(); openMgr(m.id); render(true);
+}
+
+/* ---------- ROUTER ---------- */
+function render(keep){
+  renderNav();
+  var v;
+  if(route==="home") v=viewHome();
+  else if(route==="admin") v=viewAdminShell();
+  else v=viewModule(route.slice(1));
+  $("#page").innerHTML=v;
+  if(route==="admin") fillAdmin();
+  if(!keep) $(".side").classList.remove("open");
+}
+async function show(r){
+  route=r; renderNav(); closeModal();
+  $("#page").innerHTML='<div class="empty">Loading</div>';
+  if(r==="home") await Promise.all(MODS.map(loadRecs));
+  else if(r!=="admin"){ await loadRefs(); await loadRecs(mod(r.slice(1))); }
+  if(route===r) render();
+  window.scrollTo(0,0);
+}
+function go(r){ if(r==="admin"&&S.role!=="admin") r="home"; location.hash=r; show(r); }
+
+/* ---------- c-0-4 ADMIN PANEL ---------- */
+function callFn(name,body){
+  return sb.functions.invoke(name,{body:body}).then(async function(r){
+    if(r.error){
+      var msg="Could not complete";
+      try{ var j=await r.error.context.json(); if(j&&j.error) msg=j.error; }catch(e){}
+      return {ok:false,msg:msg};
+    }
+    return {ok:true,data:r.data};
+  }).catch(function(){ return {ok:false,msg:"Could not complete"}; });
+}
+function viewAdminShell(){
+  return '<h1 class="pt">Admin panel<span class="code">0.4</span></h1>'+
+    '<h2 style="margin-top:0">User control<span class="code">0.4.1</span></h2><div id="c-0-4-1"><div class="empty">Loading</div></div>'+
+    '<h2>Login log<span class="code">0.4.2</span></h2><div id="c-0-4-2"><div class="empty">Loading</div></div>';
+}
+async function fillAdmin(){
+  var u=await callFn("manage-users",{action:"list"});
+  var box=$("#c-0-4-1"); if(!box) return;
+  if(!u.ok){ box.innerHTML='<div class="empty">'+esc(u.msg)+'</div>'; }
+  else {
+    var h='<div class="tw"><table class="wideact"><thead><tr><th>Account</th><th>Status</th><th></th></tr></thead><tbody>';
+    u.data.users.forEach(function(x){
+      h+='<tr><td>'+esc(x.username)+'</td><td><span class="tag '+(x.status==="Active"?"ok":"bad")+'">'+esc(x.status)+'</span></td><td class="act">'+
+        '<button class="btn sm" data-a="pw" data-u="'+esc(x.username)+'">Reset password</button>'+
+        '<button class="btn sm" data-a="toggle" data-u="'+esc(x.username)+'" data-s="'+esc(x.status)+'">'+(x.status==="Disabled"?"Enable":"Disable")+'</button>'+
+        '<button class="btn sm dan" data-a="signout" data-u="'+esc(x.username)+'">Sign out all devices</button></td></tr>';
+    });
+    box.innerHTML=h+'</tbody></table></div>';
+  }
+  var lg=await sb.rpc("get_login_log");
+  var lb=$("#c-0-4-2"); if(!lb) return;
+  if(lg.error){ lb.innerHTML='<div class="empty">'+esc(lg.error.message||"Error")+'</div>'; return; }
+  var rows=lg.data||[];
+  if(!rows.length){ lb.innerHTML='<div class="tw"><div class="empty">No logins yet</div></div>'; return; }
+  var t='<div class="tw"><table class="plain"><thead><tr><th>Account</th><th>Date</th><th>Time (IST)</th><th>IP address</th><th>Browser</th><th>Operating system</th><th></th></tr></thead><tbody>', prev="";
+  rows.forEach(function(l){
+    var s=fmtStamp(l.logged_at).split(" ");
+    t+='<tr><td>'+(l.username!==prev?esc(l.username):"")+'</td><td>'+s[0]+'</td><td>'+s[1]+'</td><td>'+esc(l.ip)+'</td><td>'+esc(l.browser)+'</td><td>'+esc(l.os)+'</td><td>'+(l.flagged?'<span class="tag warn">Different device</span>':"")+'</td></tr>';
+    prev=l.username;
+  });
+  lb.innerHTML=t+'</tbody></table></div>';
+}
+
+/* ---------- x.3 EXCEL IMPORT / EXPORT, 0.5 BACKUP / RESTORE ---------- */
+function headersFor(m){ var h=["ID"].concat(m.f.map(function(f){return f.l;})); if(m.arch) h.push("Archived"); return h; }
+function toAoa(m,recs){
+  var out=[headersFor(m)];
+  recs.forEach(function(r){
+    var row=[r.id];
+    m.f.forEach(function(f){
+      var v=r[f.k];
+      if(f.t==="ref") row.push(v==null?"":refName(m.ref.table,v));
+      else if(f.t==="date") row.push(fmtDate(v));
+      else row.push(v==null?"":v);
+    });
+    if(m.arch) row.push(r.archived?"Yes":"No");
+    out.push(row);
+  });
+  return out;
+}
+function sheetFrom(aoa){
+  var ws=XLSX.utils.aoa_to_sheet(aoa);
+  ws["!cols"]=aoa[0].map(function(h,i){ return {wch:Math.min(48,Math.max(12,String(h).length+4))}; });
+  return ws;
+}
+function fileStamp(){ return todayStamp(); }
+async function exportModule(m){
+  await Promise.all([loadRefs(),loadRecs(m)]);
+  var wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,sheetFrom(toAoa(m,RECS[m.id])),m.name.slice(0,31));
+  XLSX.writeFile(wb,"SIDH_"+m.name.replace(/\s+/g,"_")+"_"+fileStamp()+".xlsx");
+}
+function templateModule(m){
+  var wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,sheetFrom([headersFor(m)]),m.name.slice(0,31));
+  XLSX.writeFile(wb,"SIDH_"+m.name.replace(/\s+/g,"_")+"_template.xlsx");
+}
+async function backupAll(){
+  await loadRefs(); await Promise.all(MODS.map(loadRecs));
+  var wb=XLSX.utils.book_new();
+  MODS.forEach(function(m){ XLSX.utils.book_append_sheet(wb,sheetFrom(toAoa(m,RECS[m.id])),m.name.slice(0,31)); });
+  MODS.forEach(function(m){ if(m.ref){
+    var a=[["Name"]]; (REFS[m.ref.table]||[]).forEach(function(x){ a.push([x.name]); });
+    XLSX.utils.book_append_sheet(wb,sheetFrom(a),"List - "+m.ref.listName);
+  }});
+  XLSX.writeFile(wb,"SIDH_Backup_"+fileStamp()+".xlsx");
+}
+
+function blankCell(v){ return v===""||v===null||v===undefined||(typeof v==="string"&&!v.trim()); }
+function cellText(v){ return blankCell(v)?null:String(v).trim(); }
+function findRef(table,name,pending){
+  var low=name.toLowerCase(), l=REFS[table]||[];
+  for(var i=0;i<l.length;i++) if(l[i].name.toLowerCase()===low) return l[i].name;
+  for(var j=0;j<pending.length;j++) if(pending[j].toLowerCase()===low) return pending[j];
+  return null;
+}
+/* Check one sheet. Returns {adds,updates,errors,newRefs,fatal} - nothing is saved here. */
+function planSheet(m,aoa,existing){
+  var res={adds:[],updates:[],errors:[],newRefs:[],fatal:null};
+  if(!aoa||!aoa.length){ res.fatal="Sheet is empty"; return res; }
+  var idx={}; aoa[0].forEach(function(h,i){ var k=String(h).trim().toLowerCase(); if(!(k in idx)) idx[k]=i; });
+  var idCol=idx["id"]!=null?idx["id"]:idx["record id"];
+  var col={}; m.f.forEach(function(f){ col[f.k]=idx[f.l.toLowerCase()]; });
+  if(col[m.tk]==null){ res.fatal='Column "'+fdef(m,m.tk).l+'" not found'; return res; }
+  var byId={}; existing.forEach(function(r){ byId[r.id]=r; });
+  var seen={}, pending=[];
+  for(var r=1;r<aoa.length;r++){
+    var row=aoa[r], rn=r+1;
+    if(row.every(blankCell)) continue;
+    var errs=[], v={}, p={}, id=null;
+    var rawId=idCol!=null?row[idCol]:"";
+    if(!blankCell(rawId)){
+      var n=Number(rawId);
+      if(!Number.isInteger(n)||!byId[n]) errs.push("ID "+rawId+" not found");
+      else if(seen[n]) errs.push("ID "+n+" appears twice");
+      else { id=n; seen[n]=true; }
+    }
+    m.f.forEach(function(f){
+      var raw=col[f.k]==null?"":row[col[f.k]], val=null;
+      if(f.t==="date"){ var d=parseDate(raw); if(!d.ok) errs.push(f.l+": invalid date"); else val=d.iso; }
+      else if(f.t==="sel"){
+        var tx=cellText(raw);
+        if(tx!==null){ var hit=null; f.o.forEach(function(o){ if(o.toLowerCase()===tx.toLowerCase()) hit=o; }); if(!hit) errs.push(f.l+': "'+tx+'" not allowed'); else val=hit; }
+      } else val=cellText(raw);
+      v[f.k]=val;
+    });
+    if(v[m.tk]===null) errs.push(fdef(m,m.tk).l+" is required");
+    var arch=null;
+    if(m.arch){
+      var ar=idx["archived"]!=null?cellText(row[idx["archived"]]):null;
+      if(ar!==null){ var a=ar.toLowerCase(); if(["yes","true","1"].indexOf(a)>=0) arch=true; else if(["no","false","0"].indexOf(a)>=0) arch=false; else errs.push("Archived: use Yes or No"); }
+    }
+    if(errs.length){ res.errors.push({row:rn,msg:errs.join("; ")}); continue; }
+    m.f.forEach(function(f){
+      var val=v[f.k];
+      if(f.show && !f.show(v)) val=null;
+      if(f.t==="ref" && val!==null){
+        var found=findRef(m.ref.table,val,pending);
+        if(!found){ pending.push(val); res.newRefs.push(val); found=val; }
+        p[f.k]={ref:found};
+      } else p[f.k]=val;
+    });
+    if(id!==null){ if(arch!==null) p.archived=arch; res.updates.push({id:id,p:p}); }
+    else { if(m.arch) p.archived=arch===true; res.adds.push(p); }
+  }
+  return res;
+}
+function planList(m,aoa){
+  var names=[]; var pending=[];
+  (aoa||[]).slice(1).forEach(function(row){ var t=cellText(row[0]); if(t && !findRef(m.ref.table,t,pending)){ pending.push(t); names.push(t); } });
+  return names;
+}
+function readFile(file){
+  return file.arrayBuffer().then(function(b){ return XLSX.read(b,{type:"array"}); });
+}
+function sheetAoa(ws){ return XLSX.utils.sheet_to_json(ws,{header:1,defval:"",raw:true,blankrows:true}); }
+var PENDING = null;
+async function startImport(file,mode,m){
+  var wb;
+  try{ wb=await readFile(file); }catch(e){ toast("Could not read this file"); return; }
+  await loadRefs(); await Promise.all(MODS.map(loadRecs));
+  var plans=[], lists=[];
+  if(mode==="module"){
+    var sn=wb.SheetNames[0], aoa=sheetAoa(wb.Sheets[sn]);
+    plans.push({m:m,sheet:sn,res:planSheet(m,aoa,RECS[m.id])});
+  } else {
+    MODS.forEach(function(mm){
+      var n=wb.SheetNames.filter(function(s){return s.toLowerCase()===mm.name.slice(0,31).toLowerCase();})[0];
+      if(n) plans.push({m:mm,sheet:n,res:planSheet(mm,sheetAoa(wb.Sheets[n]),RECS[mm.id])});
+      if(mm.ref){
+        var ln=wb.SheetNames.filter(function(s){return s.toLowerCase()==="list - "+mm.ref.listName.toLowerCase();})[0];
+        if(ln){ var nm=planList(mm,sheetAoa(wb.Sheets[ln])); if(nm.length) lists.push({m:mm,names:nm}); }
+      }
+    });
+    if(!plans.length && !lists.length){ toast("No matching sheets found"); return; }
+  }
+  PENDING={plans:plans,lists:lists};
+  showSummary(mode);
+}
+function showSummary(mode){
+  var tot={a:0,u:0,e:0}, h='<h3>Import summary</h3><div class="sum tw"><table><thead><tr><th>Sheet</th><th>To add</th><th>To update</th><th>Errors</th></tr></thead><tbody>', el="";
+  PENDING.plans.forEach(function(pl){
+    var r=pl.res;
+    if(r.fatal){ h+='<tr><td>'+esc(pl.m.name)+'</td><td colspan="3">'+esc(r.fatal)+'</td></tr>'; return; }
+    h+='<tr><td>'+esc(pl.m.name)+'</td><td>'+r.adds.length+'</td><td>'+r.updates.length+'</td><td>'+r.errors.length+'</td></tr>';
+    tot.a+=r.adds.length; tot.u+=r.updates.length; tot.e+=r.errors.length;
+    r.errors.slice(0,40).forEach(function(e){ el+='<div>'+(mode==="restore"?esc(pl.m.name)+" · ":"")+'Row '+e.row+': '+esc(e.msg)+'</div>'; });
+    if(r.errors.length>40) el+='<div>and '+(r.errors.length-40)+' more</div>';
+  });
+  PENDING.lists.forEach(function(l){ h+='<tr><td>'+esc(l.m.ref.label)+'</td><td>'+l.names.length+'</td><td>0</td><td>0</td></tr>'; tot.a+=l.names.length; });
+  h+='</tbody></table></div>';
+  if(el) h+='<div class="elist">'+el+'</div>';
+  h+='<div class="mf"><button class="btn" data-a="close">Cancel</button><button class="btn pri" data-a="importok" '+((tot.a+tot.u)?"":"disabled")+'>Confirm import</button></div>';
+  openModal(h,true);
+}
+async function applyImport(){
+  var P=PENDING; PENDING=null; closeModal();
+  if(!P) return;
+  try{
+    /* 1. create any new types / personas / ministries */
+    var need={};
+    P.lists.forEach(function(l){ need[l.m.ref.table]=(need[l.m.ref.table]||[]).concat(l.names); });
+    P.plans.forEach(function(pl){ if(pl.res.newRefs.length) need[pl.m.ref.table]=(need[pl.m.ref.table]||[]).concat(pl.res.newRefs); });
+    for(var t in need){
+      var seen={}, rows=[];
+      need[t].forEach(function(n){ if(!seen[n.toLowerCase()]){ seen[n.toLowerCase()]=1; rows.push({name:n}); } });
+      var r=await sb.from(t).insert(rows); if(r.error) throw r.error;
+    }
+    await loadRefs();
+    /* 2. add and update the records */
+    var added=0, updated=0;
+    for(var i=0;i<P.plans.length;i++){
+      var pl=P.plans[i], m=pl.m; if(pl.res.fatal) continue;
+      function resolve(p){
+        var o={}; for(var k in p){ var v=p[k]; if(v&&typeof v==="object"&&v.ref){ var id=null; (REFS[m.ref.table]||[]).forEach(function(x){ if(x.name.toLowerCase()===v.ref.toLowerCase()) id=x.id; }); o[k]=id; } else o[k]=v; }
+        return o;
+      }
+      if(pl.res.adds.length){ var ins=await sb.from(m.table).insert(pl.res.adds.map(resolve)); if(ins.error) throw ins.error; added+=pl.res.adds.length; }
+      for(var j=0;j<pl.res.updates.length;j++){ var u=pl.res.updates[j]; var up=await sb.from(m.table).update(resolve(u.p)).eq("id",u.id); if(up.error) throw up.error; updated++; }
+    }
+    toast("Added "+added+", updated "+updated);
+    await Promise.all(MODS.map(loadRecs)); await loadRefs(); render();
+  }catch(e){ fail(e); }
+}
+
+/* ---------- EVENTS ---------- */
+document.addEventListener("click",async function(e){
+  var t=e.target.closest("[data-r],[data-a]"); if(!t) return;
+  if(t.dataset.r && !t.dataset.a){ go(t.dataset.r); return; }
+  var a=t.dataset.a, mid=t.dataset.m, id=t.dataset.id;
+  if(a==="close") closeModal();
+  else if(a==="add") openForm(mid);
+  else if(a==="edit") openForm(mid,id);
+  else if(a==="del") askDelete(mid,id);
+  else if(a==="delok"){
+    var m=mod(mid), r=await sb.from(m.table).delete().eq("id",Number(id));
+    if(r.error){ fail(r.error); return; }
+    closeModal(); await loadRecs(m); render();
+  }
+  else if(a==="mgr") openMgr(mid);
+  else if(a==="madd"||a==="mrename"||a==="mremove") mgrAction(a,t);
+  else if(a==="tab"){ UI.tab[mid]=t.dataset.t; render(); }
+  else if(a==="archive"||a==="restoreArc"){
+    var mm=mod(mid), rr=await sb.from(mm.table).update({archived:a==="archive"}).eq("id",Number(id));
+    if(rr.error){ fail(rr.error); return; }
+    await loadRecs(mm); render();
+  }
+  else if(a==="export") exportModule(mod(mid));
+  else if(a==="template") templateModule(mod(mid));
+  else if(a==="import"){ $("#fileIn").dataset.mode="module"; $("#fileIn").dataset.m=mid; $("#fileIn").click(); }
+  else if(a==="restore"){ $("#fileIn").dataset.mode="restore"; $("#fileIn").click(); }
+  else if(a==="backup") backupAll();
+  else if(a==="importok") applyImport();
+  else if(a==="pw"){
+    openModal('<h3>Reset password &middot; '+esc(t.dataset.u)+'<span class="code">0.4.1</span></h3><div class="fld"><label for="npw">New PIN</label><input id="npw" type="text" autocomplete="off"></div><p class="err hidden" id="perr"></p><div class="mf"><button class="btn" data-a="close">Cancel</button><button class="btn pri" data-a="pwok" data-u="'+esc(t.dataset.u)+'">Save</button></div>');
+  }
+  else if(a==="pwok"){
+    var pw=$("#npw").value;
+    if(pw.length<10){ var pe=$("#perr"); pe.textContent="At least 10 characters"; pe.classList.remove("hidden"); return; }
+    var pr=await callFn("manage-users",{action:"reset_password",username:t.dataset.u,password:pw});
+    closeModal(); toast(pr.ok?"PIN updated":pr.msg);
+  }
+  else if(a==="toggle"){
+    var tr=await callFn("manage-users",{action:t.dataset.s==="Disabled"?"enable":"disable",username:t.dataset.u});
+    toast(tr.ok?"Done":tr.msg); fillAdmin();
+  }
+  else if(a==="signout"){
+    openModal('<h3>Sign out '+esc(t.dataset.u)+' from all devices?</h3><div class="mf"><button class="btn" data-a="close">Cancel</button><button class="btn dan" data-a="signok" data-u="'+esc(t.dataset.u)+'">Sign out</button></div>');
+  }
+  else if(a==="signok"){
+    var sr=await callFn("manage-users",{action:"signout",username:t.dataset.u});
+    closeModal(); toast(sr.ok?"Signed out":sr.msg);
+  }
+});
+document.addEventListener("submit",function(e){ if(e.target.id==="frm"){ e.preventDefault(); saveForm(e.target); } });
+document.addEventListener("change",function(e){ var f=e.target.closest("#frm"); if(f) syncVisibility(f); });
+document.addEventListener("keydown",function(e){ if(e.key==="Escape") closeModal(); });
+$("#fileIn").addEventListener("change",function(){
+  var inp=this, f=inp.files[0]; if(!f) return;
+  var mode=inp.dataset.mode, m=inp.dataset.m?mod(inp.dataset.m):null;
+  inp.value=""; startImport(f,mode,m);
+});
+$("#menuBtn").addEventListener("click",function(){ $(".side").classList.toggle("open"); });
+$("#signOutBtn").addEventListener("click",function(){ doSignOut(""); });
+$("#loginForm").addEventListener("submit",doLogin);
+window.addEventListener("hashchange",function(){
+  if(!S.user) return;
+  var r=location.hash.slice(1);
+  if(r&&r!==route&&/^(home|admin|m([1-9]|10))$/.test(r)) go(r);
+});
+
+/* ---------- START ---------- */
+(async function(){
+  if(!window.supabase||!CFG.SUPABASE_URL||/PASTE/.test(CFG.SUPABASE_URL)||/PASTE/.test(CFG.SUPABASE_ANON_KEY||"")){
+    $("#c-0-2").classList.remove("hidden"); loginErr("Setup incomplete"); $("#c-0-2-4").disabled=true; return;
+  }
+  sb=window.supabase.createClient(CFG.SUPABASE_URL,CFG.SUPABASE_ANON_KEY);
+  var s=await sb.auth.getSession();
+  var last=+lsGet("sidh_active")||0;
+  if(s.data&&s.data.session){
+    if(last && Date.now()-last>IDLE_MS){ await sb.auth.signOut(); showLogin("Signed out after 30 minutes idle"); return; }
+    var ok=await sb.rpc("is_active");
+    if(!ok.error && ok.data===true){ lastActive=Date.now(); await enterApp(); return; }
+    await sb.auth.signOut();
+  }
+  showLogin();
+})();
+</script>
+</body>
+</html>
